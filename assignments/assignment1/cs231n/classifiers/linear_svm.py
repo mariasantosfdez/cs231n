@@ -39,14 +39,14 @@ def svm_loss_naive(W, X, y, reg):
                 loss += margin
                 dW[:, j] += X[i]
                 dW[:, y[i]] -= X[i]
-
+            
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
     loss /= num_train
     dW /= num_train
 
     # Add regularization to the loss.
-    loss += reg * np.sum(W * W)
+    loss += reg * np.sum(W**2)
     dW += 2 * reg * W
 
     #############################################################################
@@ -73,7 +73,7 @@ def svm_loss_vectorized(W, X, y, reg):
     Inputs and outputs are the same as svm_loss_naive.
     """
     loss = 0.0
-    dW = np.zeros(W.shape)  # initialize the gradient as zero
+    # dW = np.zeros(W.shape)  # initialize the gradient as zero
 
     #############################################################################
     # TODO:                                                                     #
@@ -83,16 +83,28 @@ def svm_loss_vectorized(W, X, y, reg):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     num_train = X.shape[0]
-    num_classes = W.shape[0]
-    num_features = W.shape[1]
+    num_classes = W.shape[1]
     
+    ## Hinge loss
     scores = X.dot(W)
-    scores_diff = scores - scores[np.arange(num_train), y]
-    hinge_loss += 1    # added margin
+    correct_score = scores[np.arange(num_train), y]
+    hinge_loss = scores - correct_score[:, np.newaxis] + 1
+    hinge_loss[np.arange(num_train), y] = 0
     hinge_loss[hinge_loss < 0] = 0
-    loss = np.sum(hinge_loss) - num_train
-    loss = 1/num_train * loss + reg * np.sum(W*W)
     
+    # gradient
+    ind_hinge = (hinge_loss > 0).astype(int)
+    ind_hinge[np.arange(num_train), y] = -np.sum(ind_hinge, axis = 1)
+    dW = np.dot(X.T, ind_hinge)
+    
+    # divide by the number of samples
+    dW *= 1.0/num_train
+    
+    # Regularization
+    loss = 1.0/num_train * np.sum(hinge_loss) + reg * np.sum(W*W)
+    
+    # gradient
+    dW += 2 * reg * W
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -112,8 +124,3 @@ def svm_loss_vectorized(W, X, y, reg):
 
     return loss, dW
 
-
-
-    # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    return loss, dW
