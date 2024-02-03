@@ -28,8 +28,13 @@ def affine_forward(x, w, b):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    # Make the input datapoints into rows
+    x_shape = x.shape
+    x = x.reshape(x.shape[0], -1)
+    out = x @ w
+    out += b
+    x = x.reshape(x_shape)
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -61,8 +66,11 @@ def affine_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    dx = dout @ w.T
+    dx = dx.reshape(x.shape)
+    dw = (x.reshape(x.shape[0], -1)).T @ dout
+    db = np.sum(dout, axis=0)
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -87,8 +95,9 @@ def relu_forward(x):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    out = np.copy(x)
+    out[out < 0] = 0
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -114,8 +123,9 @@ def relu_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    dx = dout
+    dx[x < 0] = 0    
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -773,7 +783,19 @@ def svm_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N = x.shape[0]
+    
+    # hinge loss
+    correct_x = x[np.arange(N), y]
+    hinge_loss = x - correct_x[:, np.newaxis] + 1
+    hinge_loss[np.arange(N), y] = 0
+    hinge_loss[hinge_loss < 0] = 0
+    loss = 1.0/N * hinge_loss.sum()
+
+    # gradient
+    dx = (hinge_loss > 0).astype(int)
+    dx[np.arange(N), y] = -np.sum(dx, axis = 1)
+    dx = dx / N
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -803,7 +825,18 @@ def softmax_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N = x.shape[0]
+
+    # loss
+    x = np.exp(x - x.max())
+    x /= x.sum(axis=1, keepdims=True)
+    loss = -np.log(x[np.arange(N), y]).sum()
+    loss /= N
+    
+    # gradient
+    dx = x
+    dx[np.arange(N), y] -= 1
+    dx /= N
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
