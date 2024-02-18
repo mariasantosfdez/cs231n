@@ -236,7 +236,30 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # compute mini-batch mean and variance
+        x_mean = np.mean(x, axis=0)
+        x_cent = x - x_mean
+        x_var = np.var(x_cent, axis=0)
+        # compute the standard dev (+epsilon) and its inverse
+        x_stdev = np.sqrt(x_var + eps)
+        inv_x_stdev = 1 / x_stdev
+        # normalize the input
+        x_hat = (x_cent) * inv_x_stdev
+        # scale and shift
+        out = gamma * x_hat + beta
+        
+        # cache for backward pass
+        # cache = (x_mean, x_cent, x_var, x_stdev, inv_x_stdev, x_hat, gamma, eps)
+        cache = (x_hat, x_cent, x_stdev, inv_x_stdev, x_var, gamma, eps)
+
+
+        # running averages for cache
+        running_mean = momentum * running_mean + (1 - momentum) * x_mean
+        running_var = momentum * running_var + (1 - momentum) * x_var
+
+        bn_param["running_mean"] = running_mean
+        bn_param["running_var"] = running_var
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -251,7 +274,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        out = (x - running_mean) / np.sqrt(running_var + eps)
+        out = gamma * out + beta
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -292,8 +316,33 @@ def batchnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # recover the variables from the cache
+    x_hat, x_cent, x_stdev, inv_x_stdev, x_var, gamma, eps = cache
+    
+    N, D = dout.shape
+    # out = gamma * h_hat + beta
+    dbeta = dout.sum(axis=0)            # beta in (D,)
+    dgamma = (dout * x_hat).sum(axis=0) # gamma in (D,)
+    dx_hat = dout * gamma
 
+    # x_cent = x - x_mean, x_hat = x_cent / sqrt(x_var + eps)
+    # numerator
+    dx_cent1 = dx_hat * inv_x_stdev
+    # denominator
+    dinv_x_stdev = (dx_hat * x_cent).sum(axis=0)
+    dx_stdev = dinv_x_stdev * -1. / x_stdev**2
+    dx_var = dx_stdev * 1 / (2 * x_stdev)
+    dx_cent_sq = 1. /N * np.ones((N, D)) * dx_var
+    dx_cent2 = 2 * x_cent * dx_cent_sq
+    # getting the gradient of x - x_mean
+    dx_cent = dx_cent1 + dx_cent2
+    # mean
+    dx_mean = -1 * dx_cent.sum(axis=0)
+    dx2 = 1. /N * np.ones((N,D)) * dx_mean
+    
+    # putting it all together!
+    dx = dx_cent + dx2
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -326,7 +375,20 @@ def batchnorm_backward_alt(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # recover the variables from the cache
+    x_hat, x_cent, x_stdev, inv_x_stdev, x_var, gamma, eps = cache
+
+    N, D = dout.shape
+    
+    dbeta = dout.sum(axis=0)            # beta in (D,)
+    dgamma = (dout * x_hat).sum(axis=0) # gamma in (D,)
+
+    dY = dout * gamma
+    dout_dX = np.ones((N, D)) * inv_x_stdev * dY
+    dout_dmu = -(1./N * inv_x_stdev * dY).sum(axis=0)
+    dout_dsigma = -(x_hat * inv_x_stdev * dY).sum(axis=0) * 1./N * x_hat
+    
+    dx = dout_dX + dout_dmu + dout_dsigma
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
