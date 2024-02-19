@@ -80,6 +80,10 @@ class FullyConnectedNet(object):
           self.params[f'W{i+1}'] = np.random.randn(dim_prev_layer, hidden_dims[i]) * weight_scale
           self.params[f'b{i+1}'] = np.zeros(hidden_dims[i])
           dim_prev_layer = hidden_dims[i]
+          # parameters for the normalization
+          if self.normalization:
+            self.params[f'gamma{i+1}'] = np.ones(hidden_dims[i])
+            self.params[f'beta{i+1}'] = np.zeros(hidden_dims[i])
 
         self.params[f'W{self.num_layers}'] = np.random.rand(dim_prev_layer, num_classes) * weight_scale
         self.params[f'b{self.num_layers}'] = np.zeros(num_classes)
@@ -159,14 +163,13 @@ class FullyConnectedNet(object):
         # print("b1", self.params['b1'])
 
         # {affine -- relu} x (L - 1) 
-        affine_cache = []
-        relu_cache = []
+        # affine_cache = []
+        # relu_cache = []
+        cache = []
         out = X.copy()
         for i in range(self.num_layers - 1):
-          out, c_affine = affine_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'])
-          affine_cache.append(c_affine)
-          out, c_relu = relu_forward(out)
-          relu_cache.append(c_relu)
+          out, affine_relu_cache = affine_relu_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'])
+          cache.append(affine_relu_cache)
 
         # affine -- softmax
         scores, scores_cache = affine_forward(out, self.params[f'W{self.num_layers}'], self.params[f'b{self.num_layers}'])
@@ -213,13 +216,10 @@ class FullyConnectedNet(object):
         grads[f'b{self.num_layers}'] = db
         
         # other affine - relu layers
-        assert len(relu_cache) == self.num_layers - 1,    "mismatch between number of layers and relu caches"
-        assert len(affine_cache) == self.num_layers - 1,  "mismatch between number of layers and affine caches"
+        assert len(cache) == self.num_layers - 1, "mismatch between number of layers and affine-relu caches"
         for i in range(self.num_layers - 2, -1, -1):
-          cache = relu_cache.pop()
-          dout = relu_backward(dout, cache)
-          cache = affine_cache.pop()
-          dout, dw, db = affine_backward(dout, cache)
+          affine_relu_cache = cache.pop()
+          dout, dw, db = affine_relu_backward(dout, affine_relu_cache)
           dw += self.reg * self.params[f'W{i+1}']
           grads[f'W{i+1}'] = dw
           grads[f'b{i+1}'] = db
