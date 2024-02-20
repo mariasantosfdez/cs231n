@@ -247,11 +247,10 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         x_hat = (x_cent) * inv_x_stdev
         # scale and shift
         out = gamma * x_hat + beta
-        
+
         # cache for backward pass
         # cache = (x_mean, x_cent, x_var, x_stdev, inv_x_stdev, x_hat, gamma, eps)
         cache = (x_hat, x_cent, x_stdev, inv_x_stdev, x_var, gamma, eps)
-
 
         # running averages for cache
         running_mean = momentum * running_mean + (1 - momentum) * x_mean
@@ -433,7 +432,23 @@ def layernorm_forward(x, gamma, beta, ln_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    layer_x = x.copy()
+    layer_x = layer_x.T
+    x_mean = np.mean(layer_x, axis=0)
+    x_cent = layer_x - x_mean
+    x_var = np.var(x_cent, axis=0)
+    # compute the standard dev (+epsilon) and its inverse
+    x_stdev = np.sqrt(x_var + eps)
+    inv_x_stdev = 1 / x_stdev
+    # normalize the input
+    x_hat = (x_cent) * inv_x_stdev
+    # scale and shift
+    gamma = gamma[np.newaxis].T
+    out = gamma * x_hat + beta[np.newaxis].T
+    out = out.T
+
+    # cache for backward pass
+    cache = (x_hat, x_cent, x_stdev, inv_x_stdev, x_var, gamma, eps)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -467,7 +482,24 @@ def layernorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    x_hat, x_cent, x_stdev, inv_x_stdev, x_var, gamma, eps = cache
+
+    dout = dout.T
+    N, D = dout.shape
+
+    dbeta = dout.sum(axis=1)
+    dgamma = (dout * x_hat).sum(axis=1)
+
+    dY = dout * gamma
+    dout_dX = np.ones((N, D)) * inv_x_stdev * dY
+    dout_dmu = -(1./N * inv_x_stdev * dY).sum(axis=0)
+    dout_dsigma = -(x_hat * inv_x_stdev * dY).sum(axis=0) * 1./N * x_hat
+    
+    dx = dout_dX + dout_dmu + dout_dsigma
+    
+    dx = dx.T 
+    dgamma = dgamma.T
+    dbeta = dbeta.T
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################

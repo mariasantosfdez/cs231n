@@ -160,16 +160,21 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        # print("b1", self.params['b1'])
-
         # {affine -- relu} x (L - 1) 
-        # affine_cache = []
-        # relu_cache = []
         cache = []
         out = X.copy()
         for i in range(self.num_layers - 1):
-          out, affine_relu_cache = affine_relu_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'])
-          cache.append(affine_relu_cache)
+          if self.normalization == "batchnorm":
+            out, affine_bn_relu_cache = affine_batchnorm_relu_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'],
+                                                                      self.params[f'gamma{i+1}'], self.params[f'beta{i+1}'], self.bn_params[i])
+            cache.append(affine_bn_relu_cache)
+          elif self.normalization == "layernorm":
+            out, affine_ln_relu_cache = affine_layernorm_relu_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'],
+                                                                      self.params[f'gamma{i+1}'], self.params[f'beta{i+1}'], self.bn_params[i])
+            cache.append(affine_ln_relu_cache)
+          else:
+            out, affine_relu_cache = affine_relu_forward(out, self.params[f'W{i+1}'], self.params[f'b{i+1}'])
+            cache.append(affine_relu_cache)
 
         # affine -- softmax
         scores, scores_cache = affine_forward(out, self.params[f'W{self.num_layers}'], self.params[f'b{self.num_layers}'])
@@ -218,8 +223,23 @@ class FullyConnectedNet(object):
         # other affine - relu layers
         assert len(cache) == self.num_layers - 1, "mismatch between number of layers and affine-relu caches"
         for i in range(self.num_layers - 2, -1, -1):
-          affine_relu_cache = cache.pop()
-          dout, dw, db = affine_relu_backward(dout, affine_relu_cache)
+          if self.normalization:
+            
+            if self.normalization == "batchnorm":
+              affine_bn_relu_cache = cache.pop()
+              dout, dw, db, dgamma, dbeta = affine_batchnorm_relu_backward(dout, affine_bn_relu_cache)
+            
+            elif self.normalization == "layernorm":
+              affine_ln_relu_cache = cache.pop()
+              dout, dw, db, dgamma, dbeta = affine_layernorm_relu_backward(dout, affine_ln_relu_cache)
+            
+            grads[f'gamma{i+1}'] = dgamma
+            grads[f'beta{i+1}'] = dbeta
+
+          else:
+            affine_relu_cache = cache.pop()
+            dout, dw, db = affine_relu_backward(dout, affine_relu_cache)
+            
           dw += self.reg * self.params[f'W{i+1}']
           grads[f'W{i+1}'] = dw
           grads[f'b{i+1}'] = db
